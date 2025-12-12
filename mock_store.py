@@ -2,9 +2,8 @@ import os
 import json
 import uuid
 import shutil
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional
 
-# Percorso alla cartella data (assume mock_store.py nella root del repo)
 BASE_DIR = os.path.dirname(__file__)
 DATA_DIR = os.path.join(BASE_DIR, "data")
 ATTACH_DIR = os.path.join(DATA_DIR, "attachments")
@@ -18,14 +17,11 @@ FILES = {
     "users": os.path.join(DATA_DIR, "users.json"),
 }
 
-# --- Utility per file I/O ---
-
 def _ensure_dirs_and_files():
     os.makedirs(DATA_DIR, exist_ok=True)
     os.makedirs(ATTACH_DIR, exist_ok=True)
     for key, path in FILES.items():
         if not os.path.exists(path):
-            # seed minimo: users con admin, gli altri array vuoti
             if key == "users":
                 seed = [
                     {"name": "Admin", "email": "admin@example.com", "role": "admin", "password": "admin"}
@@ -36,7 +32,7 @@ def _ensure_dirs_and_files():
                 with open(path, "w", encoding="utf-8") as f:
                     json.dump([], f, indent=2, ensure_ascii=False)
 
-# Chiama all'import per garantire file esistenti
+# garantisce che i file esistano all'import
 _ensure_dirs_and_files()
 
 def _read(name: str) -> List[Dict[str, Any]]:
@@ -52,8 +48,7 @@ def _write(name: str, data: List[Dict[str, Any]]) -> None:
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
-# --- Listing / retrieval ---
-
+# --- letture semplici ---
 def list_events() -> List[Dict[str, Any]]:
     return _read("events")
 
@@ -78,16 +73,13 @@ def get_event(event_id: str) -> Optional[Dict[str, Any]]:
 def get_service(service_id: str) -> Optional[Dict[str, Any]]:
     return next((s for s in list_services() if s.get("id") == service_id), None)
 
-# --- Save / update helpers ---
-
+# --- upsert helper ---
 def _upsert(items: List[Dict[str, Any]], payload: Dict[str, Any], id_field: str = "id") -> str:
     if id_field in payload and payload.get(id_field):
-        # update if exists
         for i, it in enumerate(items):
             if it.get(id_field) == payload[id_field]:
                 items[i] = payload
                 return payload[id_field]
-        # not found -> append
         items.append(payload)
         return payload[id_field]
     else:
@@ -96,12 +88,13 @@ def _upsert(items: List[Dict[str, Any]], payload: Dict[str, Any], id_field: str 
         items.append(payload)
         return new_id
 
-# --- CRUD specifici ---
-
+# --- eventi ---
 def save_event(payload: Dict[str, Any], event_id: Optional[str] = None) -> str:
     events = list_events()
     if event_id:
         payload["id"] = event_id
+    if not payload.get("id"):
+        payload["id"] = str(uuid.uuid4())
     eid = _upsert(events, payload, "id")
     _write("events", events)
     return eid
@@ -112,12 +105,12 @@ def delete_event(event_id: str) -> bool:
     if len(new) == len(events):
         return False
     _write("events", new)
-    # rimuovi eventuali allegati
     attach_path = os.path.join(ATTACH_DIR, event_id)
     if os.path.exists(attach_path):
         shutil.rmtree(attach_path, ignore_errors=True)
     return True
 
+# --- service / tm / artist / format / user CRUD ---
 def save_service(payload: Dict[str, Any], service_id: Optional[str] = None) -> str:
     services = list_services()
     if service_id:
@@ -152,10 +145,8 @@ def save_format(payload: Dict[str, Any], format_id: Optional[str] = None) -> str
 
 def save_user(payload: Dict[str, Any], user_email: Optional[str] = None) -> str:
     users = list_users()
-    # use email as unique key if provided
     if user_email:
         payload["email"] = user_email
-    # if email exists update
     for i, u in enumerate(users):
         if u.get("email") == payload.get("email"):
             users[i] = payload
@@ -165,27 +156,18 @@ def save_user(payload: Dict[str, Any], user_email: Optional[str] = None) -> str:
     _write("users", users)
     return payload.get("email", str(uuid.uuid4()))
 
-# --- Attachments ---
-
+# --- attachments ---
 def _ensure_event_attach_dir(event_id: str) -> str:
     target = os.path.join(ATTACH_DIR, event_id)
     os.makedirs(target, exist_ok=True)
     return target
 
 def save_attachment(streamlit_file: Any, event_id: Optional[str]) -> Dict[str, Any]:
-    """
-    streamlit_file: oggetto UploadedFile di Streamlit o file-like.
-    event_id: id dell'evento; se None verrà usata cartella 'temp'
-    Restituisce metadata: {name, storage_path, type}
-    """
     eid = event_id or "temp"
     target_dir = _ensure_event_attach_dir(eid)
     filename = getattr(streamlit_file, "name", None) or f"file_{uuid.uuid4().hex}"
     target_path = os.path.join(target_dir, filename)
-
-    # Se è un UploadedFile di Streamlit ha metodo .read()
     try:
-        # streamlit UploadedFile supports .read()
         content = streamlit_file.read()
         with open(target_path, "wb") as f:
             if isinstance(content, bytes):
@@ -193,14 +175,11 @@ def save_attachment(streamlit_file: Any, event_id: Optional[str]) -> Dict[str, A
             else:
                 f.write(content.encode("utf-8"))
     except Exception:
-        # fallback: se è file-like, usare shutil
         try:
             with open(target_path, "wb") as f:
                 shutil.copyfileobj(streamlit_file, f)
         except Exception:
-            # ultima risorsa: creare file vuoto
             open(target_path, "wb").close()
-
     return {"name": filename, "storage_path": target_path, "type": "attachment"}
 
 def list_attachments(event_id: str) -> List[Dict[str, Any]]:
@@ -219,16 +198,14 @@ def delete_attachment(event_id: str, filename: str) -> bool:
         return True
     return False
 
-# --- Utility di ricerca / controllo ---
-
+# --- utilità di ricerca ---
 def find_events_by_service_and_date(service_id: str, date_iso: str) -> List[Dict[str, Any]]:
     return [e for e in list_events() if e.get("service_id") == service_id and e.get("date") == date_iso]
 
 def find_events_by_artist_or_format(af_id: str) -> List[Dict[str, Any]]:
     return [e for e in list_events() if e.get("artist_or_format_id") == af_id]
 
-# --- Export / import helper (facoltativo) ---
-
+# --- export/import ---
 def export_all() -> Dict[str, Any]:
     return {
         "events": list_events(),
@@ -243,5 +220,3 @@ def import_all(data: Dict[str, Any]) -> None:
     for key in ["events", "services", "tour_managers", "artists", "formats", "users"]:
         if key in data:
             _write(key, data[key])
-
-# --- Fine mock_store ---
