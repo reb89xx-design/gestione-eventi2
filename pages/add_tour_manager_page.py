@@ -1,6 +1,9 @@
+# all'inizio del file pages/home_page.py
 import streamlit as st
-import mock_store as store
+from utils.auth import require_login
+require_login()
 
+# poi il resto del file come prima
 def add_tour_manager_page():
     st.header("Aggiungi Tour Manager")
     name = st.text_input("Nome")
