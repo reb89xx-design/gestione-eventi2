@@ -3,7 +3,6 @@ import streamlit as st
 from utils.auth import login
 
 def render_login():
-    st.set_page_config(page_title="Login", layout="centered")
     st.title("Accedi a Gestione Eventi")
     st.write("Inserisci le credenziali per continuare")
 
@@ -17,12 +16,8 @@ def render_login():
             if user:
                 st.session_state["user"] = user
                 st.success(f"Benvenuto {user.get('name','')}")
-                # se c'è una pagina richiesta, ricarica per navigare lì
                 next_page = st.session_state.pop("next_page", None)
-                if next_page:
-                    st.experimental_rerun()
-                else:
-                    st.experimental_rerun()
+                st.experimental_rerun()
             else:
                 st.error("Credenziali non valide")
     st.markdown("---")
