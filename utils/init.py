@@ -1,5 +1,4 @@
-# rende utils un package Python
-# file vuoto o con export utili
+# utils package
 from .events_utils import (
     generate_readable_event_id,
     is_service_available,
