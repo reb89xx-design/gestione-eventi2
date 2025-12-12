@@ -1,14 +1,19 @@
 import streamlit as st
+import pandas as pd
 from utils.events_utils import home_table
 
-def home_page():
-    st.header("Home")
-    colf, colbtn = st.columns([3,1])
-    with colf:
-        filter_artist = st.text_input("Filtro Artisti (ricerca per nome)")
-    with colbtn:
-        if st.button("AGGIUNGI NUOVO EVENTO"):
-            st.session_state["nav_override"] = "Aggiungi Evento"
-            st.experimental_rerun()
-    df = home_table(filter_artist=filter_artist)
-    st.dataframe(df)
+st.set_page_config(page_title="Home", layout="wide")
+
+st.title("Home - Gestione Eventi")
+
+# filtro rapido
+q = st.text_input("Cerca artista o format")
+
+df = home_table(filter_artist=q if q else None)
+st.markdown(f"**{len(df)} eventi trovati**")
+
+if df.empty:
+    st.info("Nessun evento da mostrare.")
+else:
+    st.dataframe(df, height=400)
+
