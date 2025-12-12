@@ -1,4 +1,9 @@
+# all'inizio del file pages/home_page.py
 import streamlit as st
+from utils.auth import require_login
+require_login()
+
+# poi il resto del file come prima
 import pandas as pd
 from datetime import date, datetime, timedelta
 import mock_store as store
@@ -109,3 +114,4 @@ def render_calendar():
                     st.cache_data.clear()
                     st.session_state.editing_event = None
                     st.experimental_rerun()
+
