@@ -2,7 +2,7 @@ import re
 from datetime import datetime
 import pandas as pd
 import mock_store as store
-from typing import List, Dict, Any, Optional
+from typing import Optional, List
 
 def _slugify(text: str, maxlen: int = 20) -> str:
     if not text:
@@ -30,7 +30,7 @@ def is_service_available(service_id: str, ev_date: str) -> bool:
     blackout = {r.get("date") for r in svc.get("availability_rules", []) if r.get("type") == "blackout"}
     return ev_date not in blackout
 
-def check_service_conflict(service_id: str, event_date: str, exclude_event_id: str = None) -> List[str]:
+def check_service_conflict(service_id: str, event_date: str, exclude_event_id: Optional[str] = None) -> List[str]:
     if not service_id:
         return []
     conflicts = []
@@ -45,7 +45,6 @@ def home_table(filter_artist: Optional[str] = None) -> pd.DataFrame:
     df = pd.DataFrame(store.list_events())
     if df.empty:
         return pd.DataFrame(columns=["id","type","date","location","artist_or_format_name","service_id","hotel_status"])
-    # normalizza colonne se mancanti
     for col in ["artist_or_format_name","service_id","hotel_status","location","type","date","id"]:
         if col not in df.columns:
             df[col] = None
@@ -53,8 +52,3 @@ def home_table(filter_artist: Optional[str] = None) -> pd.DataFrame:
         df = df[df["artist_or_format_name"].str.contains(filter_artist, case=False, na=False)]
     df = df.sort_values("date")
     return df[["id","type","date","location","artist_or_format_name","service_id","hotel_status"]]
-
-
-        ev_id = store.save_event(payload, existing_id)
-        st.success(f"Evento salvato ({ev_id})")
-        st.experimental_rerun()
