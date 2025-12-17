@@ -1,8 +1,5 @@
 # app.py
 import streamlit as st
-
-st.set_page_config(page_title="Gestione Eventi", layout="wide")
-
 from utils.auth import require_login, logout
 
 PUBLIC_PAGES = {"Login": "login_page"}
